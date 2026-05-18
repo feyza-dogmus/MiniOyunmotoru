@@ -1,42 +1,46 @@
 /**
- * Renderer - Oyun nesnelerini ekrana çizen sınıf.
- * GameManager ve GameObject'e sıkı bağımlı.
- * Tip kontrolü burada da tekrarlanıyor — DRY ihlali.
+ * Renderer - Oyun sahnesini çizen sınıf.
+ * 
+ * Faz 1: instanceof kullanılarak tip kontrolü yapılıyor.
+ * String karşılaştırması yerine polimorfizm ve instanceof kullanıldı.
+ * (Faz 2'de Decorator/Adapter ile daha da iyileştirilebilir)
  */
 public class Renderer {
 
     /**
-     * Tek bir nesneyi render et — tip bazlı farklı görsel
+     * Tek bir nesneyi render et
      */
     public void renderObject(GameObject obj) {
         if (!obj.isAlive()) return;
 
-        if (obj.getType().equals("PLAYER")) {
+        if (obj instanceof Player) {
             System.out.println("🟦 [P] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ")");
-        } else if (obj.getType().equals("ENEMY")) {
-            // Düşman tipine göre farklı render
-            if (obj.getEnemyType() != null && obj.getEnemyType().equals("BOSS")) {
-                System.out.println("🟥 [BOSS] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ") ❤ " + obj.getHealth());
-            } else if (obj.getEnemyType() != null && obj.getEnemyType().equals("TANK")) {
-                System.out.println("🟧 [TANK] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ") ❤ " + obj.getHealth());
-            } else if (obj.getEnemyType() != null && obj.getEnemyType().equals("FAST")) {
-                System.out.println("🟨 [FAST] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ") ❤ " + obj.getHealth());
-            } else {
-                System.out.println("🟫 [E] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ") ❤ " + obj.getHealth());
+        } else if (obj instanceof Enemy) {
+            Enemy enemy = (Enemy) obj;
+            String icon;
+            switch (enemy.getEnemyType()) {
+                case "BOSS": icon = "🟥 [BOSS]"; break;
+                case "TANK": icon = "🟧 [TANK]"; break;
+                case "FAST": icon = "🟨 [FAST]"; break;
+                default:     icon = "🟫 [E]"; break;
             }
-        } else if (obj.getType().equals("COLLECTIBLE")) {
-            if (obj.getItemEffect() != null && obj.getItemEffect().equals("HEALTH")) {
-                System.out.println("💚 [HP] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ")");
-            } else if (obj.getItemEffect() != null && obj.getItemEffect().equals("SPEED")) {
-                System.out.println("💛 [SPD] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ")");
-            } else if (obj.getItemEffect() != null && obj.getItemEffect().equals("DAMAGE")) {
-                System.out.println("💜 [DMG] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ")");
+            System.out.println(icon + " " + enemy.getName() + " (" + enemy.getX() + "," + enemy.getY() + ") ❤ " + enemy.getHealth());
+        } else if (obj instanceof Collectible) {
+            Collectible item = (Collectible) obj;
+            String icon;
+            switch (item.getItemEffect()) {
+                case "HEALTH": icon = "💚 [HP]"; break;
+                case "SPEED":  icon = "💛 [SPD]"; break;
+                case "DAMAGE": icon = "💜 [DMG]"; break;
+                default:       icon = "⬜ [?]"; break;
             }
-        } else if (obj.getType().equals("OBSTACLE")) {
-            if (obj.isDestructible()) {
-                System.out.println("🟫 [O] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ") 🔨");
+            System.out.println(icon + " " + item.getName() + " (" + item.getX() + "," + item.getY() + ")");
+        } else if (obj instanceof Obstacle) {
+            Obstacle obstacle = (Obstacle) obj;
+            if (obstacle.isDestructible()) {
+                System.out.println("🟫 [O] " + obstacle.getName() + " (" + obstacle.getX() + "," + obstacle.getY() + ") 🔨");
             } else {
-                System.out.println("⬛ [O] " + obj.getName() + " (" + obj.getX() + "," + obj.getY() + ") 🔒");
+                System.out.println("⬛ [O] " + obstacle.getName() + " (" + obstacle.getX() + "," + obstacle.getY() + ") 🔒");
             }
         }
     }
@@ -60,14 +64,14 @@ public class Renderer {
     }
 
     /**
-     * HUD (Heads-Up Display) render — oyuncu bilgileri
+     * HUD render — oyuncu bilgileri
      */
     public void renderHUD(GameManager gameManager) {
-        GameObject player = gameManager.getPlayer();
+        Player player = gameManager.getPlayer();
         if (player != null && player.isAlive()) {
             System.out.println("┌─────────── HUD ───────────┐");
             System.out.println("│ Oyuncu: " + player.getName());
-            System.out.println("│ Can: " + player.getHealth() + "/" + 100);
+            System.out.println("│ Can: " + player.getHealth() + "/" + player.getMaxHealth());
             System.out.println("│ Skor: " + player.getScore());
             System.out.println("│ Pozisyon: (" + player.getX() + ", " + player.getY() + ")");
             System.out.println("│ Hız: " + player.getSpeed() + " | Hasar: " + player.getDamage());
@@ -76,38 +80,25 @@ public class Renderer {
     }
 
     /**
-     * Harita render — basit grid gösterimi
-     * Bu metot GameManager'a doğrudan erişiyor — yüksek bağımlılık
+     * Harita render
      */
     public void renderMap(GameManager gameManager, int width, int height) {
         char[][] map = new char[height][width];
 
-        // Boş harita
         for (int i = 0; i < height; i++) {
             for (int j = 0; j < width; j++) {
                 map[i][j] = '.';
             }
         }
 
-        // Nesneleri yerleştir — yine tip kontrolü
         for (GameObject obj : gameManager.getGameObjects()) {
             if (obj.isAlive()) {
                 int px = Math.max(0, Math.min(obj.getX(), width - 1));
                 int py = Math.max(0, Math.min(obj.getY(), height - 1));
-
-                if (obj.getType().equals("PLAYER")) {
-                    map[py][px] = 'P';
-                } else if (obj.getType().equals("ENEMY")) {
-                    map[py][px] = 'E';
-                } else if (obj.getType().equals("COLLECTIBLE")) {
-                    map[py][px] = 'C';
-                } else if (obj.getType().equals("OBSTACLE")) {
-                    map[py][px] = '#';
-                }
+                map[py][px] = obj.getDisplaySymbol().charAt(0);
             }
         }
 
-        // Haritayı yazdır
         System.out.println("Harita (" + width + "x" + height + "):");
         for (int i = 0; i < height; i++) {
             for (int j = 0; j < width; j++) {
