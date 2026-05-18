@@ -1,55 +1,74 @@
 /**
  * Main - Oyunun giriş noktası.
  * 
- * Faz 1: Nesne yaratma artık GameObjectFactory üzerinden yapılıyor.
- * GameManager, factory'yi kendi içinde kullanıyor.
+ * Faz 2: GameEngine Facade kullanılarak basitleştirildi.
+ * Decorator pattern ile dinamik yetenekler ekleniyor.
  */
 public class Main {
 
     public static void main(String[] args) {
-        System.out.println("╔══════════════════════════════════╗");
-        System.out.println("║    🎮 MİNİ OYUN MOTORU v1.0     ║");
-        System.out.println("║   Faz 1 — Factory Method         ║");
-        System.out.println("╚══════════════════════════════════╝");
-        System.out.println();
 
-        // Oyun yöneticisini oluştur (factory dahili)
-        GameManager gameManager = new GameManager();
-        Renderer renderer = new Renderer();
+        // Facade ile oyun motoru oluştur
+        GameEngine engine = new GameEngine();
+        engine.initialize();
 
-        // Oyuncu oluştur — factory üzerinden
-        gameManager.addPlayer("Kahraman", 10, 10);
+        // --- Oyuncu oluştur ---
+        Player player = engine.addPlayer("Kahraman", 10, 10);
 
-        // Düşmanlar oluştur — factory üzerinden, tip belirterek
-        gameManager.addEnemy("Goblin", 12, 11, "BASIC");
-        gameManager.addEnemy("Kurt", 8, 9, "FAST");
-        gameManager.addEnemy("Golem", 15, 10, "TANK");
-        gameManager.addEnemy("Ejderha", 20, 15, "BOSS");
+        // --- Düşmanlar oluştur ---
+        engine.addEnemy("Goblin", 12, 11, "BASIC");
+        engine.addEnemy("Kurt", 8, 9, "FAST");
+        Enemy golem = engine.addEnemy("Golem", 15, 10, "TANK");
+        engine.addEnemy("Ejderha", 20, 15, "BOSS");
 
-        // Toplanabilir nesneler — factory üzerinden
-        gameManager.addCollectible("Sağlık İksiri", 11, 10, "HEALTH", 25);
-        gameManager.addCollectible("Hız Büyüsü", 9, 12, "SPEED", 3);
-        gameManager.addCollectible("Güç Yüzüğü", 14, 8, "DAMAGE", 5);
-
-        // Engeller — factory üzerinden
-        gameManager.addObstacle("Kaya", 13, 10, true, 3);
-        gameManager.addObstacle("Duvar", 10, 13, false, 0);
-
-        // Başlangıç durumunu göster
-        gameManager.printStatus();
-
-        // Sahneyi render et
-        renderer.renderHUD(gameManager);
-        renderer.renderScene(gameManager);
-        renderer.renderMap(gameManager, 25, 20);
+        // --- Item ve engeller ---
+        engine.addCollectible("Sağlık İksiri", 11, 10, "HEALTH", 25);
+        engine.addCollectible("Hız Büyüsü", 9, 12, "SPEED", 3);
+        engine.addCollectible("Güç Yüzüğü", 14, 8, "DAMAGE", 5);
+        engine.addObstacle("Kaya", 13, 10, true, 3);
+        engine.addObstacle("Duvar", 10, 13, false, 0);
 
         System.out.println();
 
-        // Oyun döngüsünü başlat
-        gameManager.gameLoop(5);
+        // --- Decorator Pattern Demo ---
+        System.out.println("═══ DECORATOR PATTERN DEMO ═══");
 
-        // Son durumu göster
+        // Oyuncuya zırh ekle (Decorator)
+        ArmorDecorator armoredPlayer = engine.addArmor(player, 30);
+
+        // Zırhlı oyuncuya hız artışı ekle (Decorator zinciri)
+        SpeedBoostDecorator boostedPlayer = engine.addSpeedBoost(armoredPlayer, 3, 5);
+
+        // Hasar artışı ekle (üçlü decorator zinciri)
+        DamageBoostDecorator poweredPlayer = engine.addDamageBoost(boostedPlayer, 8);
+
+        System.out.println("\n📊 Decorator zinciri sonucu:");
+        System.out.println("  Orijinal hız: " + player.getSpeed() + " → Decorated hız: " + poweredPlayer.getSpeed());
+        System.out.println("  Orijinal hasar: " + player.getDamage() + " → Decorated hasar: " + poweredPlayer.getDamage());
+
+        System.out.println();
+
+        // Zırh testi
+        System.out.println("═══ ZIRH TESTİ ═══");
+        System.out.println("Hasar öncesi — Can: " + poweredPlayer.getHealth() + " | Zırh: " + armoredPlayer.getArmorPoints());
+        poweredPlayer.takeDamage(20);
+        System.out.println("20 hasar sonrası — Can: " + poweredPlayer.getHealth() + " | Zırh: " + armoredPlayer.getArmorPoints());
+        poweredPlayer.takeDamage(25);
+        System.out.println("25 hasar daha — Can: " + poweredPlayer.getHealth() + " | Zırh: " + armoredPlayer.getArmorPoints());
+
+        System.out.println();
+
+        // --- Facade ile render ---
+        engine.showStatus();
+        engine.renderAll();
+
+        System.out.println();
+
+        // --- Oyun döngüsü ---
+        engine.run(3);
+
+        // Son durum
         System.out.println("\n=== FINAL DURUMU ===");
-        gameManager.printStatus();
+        engine.showStatus();
     }
 }
