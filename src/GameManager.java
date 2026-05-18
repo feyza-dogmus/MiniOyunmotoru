@@ -2,80 +2,64 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * GameManager - Oyun döngüsünü ve tüm nesneleri yöneten sınıf.
- * Nesne yaratma, güncelleme, çarpışma kontrolü hepsi burada.
- * Sıkı bağlı (tightly coupled) ve şişirilmiş bir yapı.
+ * GameManager - Oyun döngüsünü ve nesneleri yöneten sınıf.
+ * 
+ * Faz 1 Refactoring: Nesne yaratma sorumluluğu GameObjectFactory'ye devredildi.
+ * if-else zincirleri büyük ölçüde azaltıldı.
  */
 public class GameManager {
 
     private List<GameObject> gameObjects;
-    private GameObject player;
+    private Player player;
+    private GameObjectFactory factory;
     private boolean isRunning;
     private int turnCount;
-    private int mapWidth = 50;
-    private int mapHeight = 50;
 
     public GameManager() {
         this.gameObjects = new ArrayList<>();
+        this.factory = new GameObjectFactory();
         this.isRunning = false;
         this.turnCount = 0;
     }
 
     /**
-     * Nesne yaratma — tip kontrolü ile farklı parametreler
+     * Oyuncu oluştur — Factory kullanarak
      */
-    public GameObject createObject(String type, String name, int x, int y) {
-        GameObject obj = new GameObject(type, name, x, y);
-
-        if (type.equals("PLAYER")) {
-            if (player != null) {
-                System.out.println("Zaten bir oyuncu var!");
-                return null;
-            }
-            player = obj;
-        } else if (type.equals("ENEMY")) {
-            // Varsayılan düşman tipi
-            obj.setEnemyType("BASIC");
-        } else if (type.equals("COLLECTIBLE")) {
-            obj.setItemEffect("HEALTH", 20);
-        } else if (type.equals("OBSTACLE")) {
-            // Varsayılan olarak yıkılabilir
+    public Player addPlayer(String name, int x, int y) {
+        if (player != null) {
+            System.out.println("Zaten bir oyuncu var!");
+            return null;
         }
-
-        gameObjects.add(obj);
-        return obj;
+        player = factory.createPlayer(name, x, y);
+        gameObjects.add(player);
+        return player;
     }
 
     /**
-     * Özel düşman yaratma — daha fazla if-else
+     * Düşman oluştur — Factory kullanarak
      */
-    public GameObject createEnemy(String name, int x, int y, String enemyType) {
-        GameObject enemy = new GameObject("ENEMY", name, x, y);
-        enemy.setEnemyType(enemyType);
-
-        // Düşman tipine göre özel ayarlar — burada da if-else
-        if (enemyType.equals("BOSS")) {
-            System.out.println("⚠ BOSS düşman oluşturuldu: " + name);
-        } else if (enemyType.equals("TANK")) {
-            System.out.println("🛡 Tank düşman oluşturuldu: " + name);
-        } else if (enemyType.equals("FAST")) {
-            System.out.println("💨 Hızlı düşman oluşturuldu: " + name);
-        } else {
-            System.out.println("👾 Düşman oluşturuldu: " + name);
-        }
-
+    public Enemy addEnemy(String name, int x, int y, String enemyType) {
+        Enemy enemy = factory.createEnemy(name, x, y, enemyType);
         gameObjects.add(enemy);
         return enemy;
     }
 
     /**
-     * Özel item yaratma
+     * Toplanabilir nesne oluştur — Factory kullanarak
      */
-    public GameObject createCollectible(String name, int x, int y, String effect, int amount) {
-        GameObject item = new GameObject("COLLECTIBLE", name, x, y);
-        item.setItemEffect(effect, amount);
+    public Collectible addCollectible(String name, int x, int y, String effect, int amount) {
+        Collectible item = factory.createCollectible(name, x, y, effect, amount);
         gameObjects.add(item);
         return item;
+    }
+
+    /**
+     * Engel oluştur — Factory kullanarak
+     */
+    public Obstacle addObstacle(String name, int x, int y, boolean destructible, int durability) {
+        Obstacle obstacle = factory.createObstacle(name, x, y, destructible, durability);
+        gameObjects.add(obstacle);
+        return obstacle;
     }
 
     /**
@@ -89,13 +73,8 @@ public class GameManager {
             turnCount++;
             System.out.println("--- Tur " + turnCount + " ---");
 
-            // Tüm nesneleri güncelle
             updateAll();
-
-            // Çarpışma kontrolü
             checkCollisions();
-
-            // Ölü nesneleri temizle
             cleanupDead();
 
             // Oyun bitti mi?
@@ -107,7 +86,7 @@ public class GameManager {
             // Tüm düşmanlar öldü mü?
             boolean allEnemiesDead = true;
             for (GameObject obj : gameObjects) {
-                if (obj.getType().equals("ENEMY") && obj.isAlive()) {
+                if (obj instanceof Enemy && obj.isAlive()) {
                     allEnemiesDead = false;
                     break;
                 }
@@ -123,20 +102,14 @@ public class GameManager {
         System.out.println("=== OYUN BİTTİ === (Toplam tur: " + turnCount + ")");
     }
 
-    /**
-     * Tüm nesneleri güncelle
-     */
     private void updateAll() {
         for (GameObject obj : gameObjects) {
             if (obj.isAlive()) {
-                obj.update();
+                obj.update(); // Polimorfizm — her nesne kendi update'ini çalıştırır
             }
         }
     }
 
-    /**
-     * Çarpışma kontrolü — basit mesafe kontrolü, O(n²) karmaşıklık
-     */
     private void checkCollisions() {
         for (int i = 0; i < gameObjects.size(); i++) {
             for (int j = i + 1; j < gameObjects.size(); j++) {
@@ -145,7 +118,6 @@ public class GameManager {
 
                 if (!a.isAlive() || !b.isAlive()) continue;
 
-                // Basit mesafe kontrolü
                 int dx = Math.abs(a.getX() - b.getX());
                 int dy = Math.abs(a.getY() - b.getY());
 
@@ -156,30 +128,23 @@ public class GameManager {
         }
     }
 
-    /**
-     * Ölü nesneleri temizle
-     */
     private void cleanupDead() {
         List<GameObject> toRemove = new ArrayList<>();
         for (GameObject obj : gameObjects) {
             if (!obj.isAlive()) {
-                // Tip kontrolü — yine if-else
-                if (obj.getType().equals("ENEMY")) {
-                    System.out.println("☠ Düşman yok edildi: " + obj.getName());
+                // Polimorfizm sayesinde artık tip kontrolüne gerek kalmadı
+                if (obj instanceof Enemy) {
+                    Enemy enemy = (Enemy) obj;
+                    System.out.println("☠ Düşman yok edildi: " + enemy.getName());
                     if (player != null && player.isAlive()) {
-                        // Düşman tipine göre farklı skor — bir kez daha if-else
-                        if (obj.getEnemyType() != null && obj.getEnemyType().equals("BOSS")) {
-                            player.setHealth(player.getHealth()); // placeholder
-                            System.out.println("🏆 Boss yenildi! +50 puan");
-                        } else if (obj.getEnemyType() != null && obj.getEnemyType().equals("TANK")) {
-                            System.out.println("🏆 Tank yenildi! +30 puan");
-                        } else {
-                            System.out.println("🏆 Düşman yenildi! +10 puan");
-                        }
+                        int points = enemy.getEnemyType().equals("BOSS") ? 50 :
+                                     enemy.getEnemyType().equals("TANK") ? 30 : 10;
+                        player.addScore(points);
+                        System.out.println("🏆 +" + points + " puan!");
                     }
-                } else if (obj.getType().equals("COLLECTIBLE")) {
+                } else if (obj instanceof Collectible) {
                     System.out.println("✨ Item toplandı: " + obj.getName());
-                } else if (obj.getType().equals("OBSTACLE")) {
+                } else if (obj instanceof Obstacle) {
                     System.out.println("💥 Engel yıkıldı: " + obj.getName());
                 }
                 toRemove.add(obj);
@@ -196,22 +161,25 @@ public class GameManager {
         System.out.println("Toplam nesne: " + gameObjects.size());
         for (GameObject obj : gameObjects) {
             if (obj.isAlive()) {
-                // Tip bazlı farklı durum çıktısı — if-else
-                if (obj.getType().equals("PLAYER")) {
-                    System.out.println("  [OYUNCU] " + obj.getName() + " — Can: " + obj.getHealth() + " | Skor: " + obj.getScore());
-                } else if (obj.getType().equals("ENEMY")) {
-                    System.out.println("  [DÜŞMAN] " + obj.getName() + " (" + obj.getEnemyType() + ") — Can: " + obj.getHealth());
-                } else if (obj.getType().equals("COLLECTIBLE")) {
-                    System.out.println("  [ITEM] " + obj.getName() + " — Etki: " + obj.getItemEffect());
-                } else if (obj.getType().equals("OBSTACLE")) {
-                    System.out.println("  [ENGEL] " + obj.getName() + " — Yıkılabilir: " + obj.isDestructible());
+                if (obj instanceof Player) {
+                    Player p = (Player) obj;
+                    System.out.println("  [OYUNCU] " + p.getName() + " — Can: " + p.getHealth() + " | Skor: " + p.getScore());
+                } else if (obj instanceof Enemy) {
+                    Enemy e = (Enemy) obj;
+                    System.out.println("  [DÜŞMAN] " + e.getName() + " (" + e.getEnemyType() + ") — Can: " + e.getHealth());
+                } else if (obj instanceof Collectible) {
+                    Collectible c = (Collectible) obj;
+                    System.out.println("  [ITEM] " + c.getName() + " — Etki: " + c.getItemEffect());
+                } else if (obj instanceof Obstacle) {
+                    Obstacle o = (Obstacle) obj;
+                    System.out.println("  [ENGEL] " + o.getName() + " — Yıkılabilir: " + o.isDestructible());
                 }
             }
         }
         System.out.println("===================\n");
     }
 
-    public GameObject getPlayer() { return player; }
+    public Player getPlayer() { return player; }
     public List<GameObject> getGameObjects() { return gameObjects; }
     public boolean isRunning() { return isRunning; }
 }

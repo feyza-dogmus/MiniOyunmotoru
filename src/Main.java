@@ -1,37 +1,39 @@
 /**
  * Main - Oyunun giriş noktası.
- * Tüm nesneler burada elle yaratılıyor ve oyun döngüsü başlatılıyor.
+ * 
+ * Faz 1: Nesne yaratma artık GameObjectFactory üzerinden yapılıyor.
+ * GameManager, factory'yi kendi içinde kullanıyor.
  */
 public class Main {
 
     public static void main(String[] args) {
         System.out.println("╔══════════════════════════════════╗");
-        System.out.println("║    🎮 MİNİ OYUN MOTORU v0.1     ║");
-        System.out.println("║       Faz 0 — Başlangıç         ║");
+        System.out.println("║    🎮 MİNİ OYUN MOTORU v1.0     ║");
+        System.out.println("║   Faz 1 — Factory Method         ║");
         System.out.println("╚══════════════════════════════════╝");
         System.out.println();
 
-        // Oyun yöneticisini oluştur
+        // Oyun yöneticisini oluştur (factory dahili)
         GameManager gameManager = new GameManager();
         Renderer renderer = new Renderer();
 
-        // Oyuncu oluştur
-        gameManager.createObject("PLAYER", "Kahraman", 10, 10);
+        // Oyuncu oluştur — factory üzerinden
+        gameManager.addPlayer("Kahraman", 10, 10);
 
-        // Düşmanlar oluştur — farklı tipler
-        gameManager.createEnemy("Goblin", 12, 11, "BASIC");
-        gameManager.createEnemy("Kurt", 8, 9, "FAST");
-        gameManager.createEnemy("Golem", 15, 10, "TANK");
-        gameManager.createEnemy("Ejderha", 20, 15, "BOSS");
+        // Düşmanlar oluştur — factory üzerinden, tip belirterek
+        gameManager.addEnemy("Goblin", 12, 11, "BASIC");
+        gameManager.addEnemy("Kurt", 8, 9, "FAST");
+        gameManager.addEnemy("Golem", 15, 10, "TANK");
+        gameManager.addEnemy("Ejderha", 20, 15, "BOSS");
 
-        // Toplanabilir nesneler oluştur
-        gameManager.createCollectible("Sağlık İksiri", 11, 10, "HEALTH", 25);
-        gameManager.createCollectible("Hız Büyüsü", 9, 12, "SPEED", 3);
-        gameManager.createCollectible("Güç Yüzüğü", 14, 8, "DAMAGE", 5);
+        // Toplanabilir nesneler — factory üzerinden
+        gameManager.addCollectible("Sağlık İksiri", 11, 10, "HEALTH", 25);
+        gameManager.addCollectible("Hız Büyüsü", 9, 12, "SPEED", 3);
+        gameManager.addCollectible("Güç Yüzüğü", 14, 8, "DAMAGE", 5);
 
-        // Engeller oluştur
-        gameManager.createObject("OBSTACLE", "Kaya", 13, 10);
-        gameManager.createObject("OBSTACLE", "Duvar", 10, 13);
+        // Engeller — factory üzerinden
+        gameManager.addObstacle("Kaya", 13, 10, true, 3);
+        gameManager.addObstacle("Duvar", 10, 13, false, 0);
 
         // Başlangıç durumunu göster
         gameManager.printStatus();
@@ -43,7 +45,7 @@ public class Main {
 
         System.out.println();
 
-        // Oyun döngüsünü başlat (5 tur)
+        // Oyun döngüsünü başlat
         gameManager.gameLoop(5);
 
         // Son durumu göster
