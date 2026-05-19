@@ -1,0 +1,30 @@
+name: CI — Mini Oyun Motoru
+
+on:
+  push:
+    branches: [ main, phase-1, phase-2, phase-3 ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout kod
+        uses: actions/checkout@v4
+
+      - name: Java 17 kur
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Derle
+        run: cd src && javac *.java
+
+      - name: Çalıştır (smoke test)
+        run: cd src && java Main
+
+      - name: Temizle
+        run: cd src && rm -f *.class
