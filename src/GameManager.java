@@ -4,22 +4,31 @@ import java.util.List;
 /**
  * GameManager - Oyun döngüsünü ve nesneleri yöneten sınıf.
  * 
- * Faz 1 Refactoring: Nesne yaratma sorumluluğu GameObjectFactory'ye devredildi.
- * if-else zincirleri büyük ölçüde azaltıldı.
+ * Faz 3: Observer pattern ile olay sistemi entegre edildi.
+ * Skor, log ve diğer yan etkiler event listener'larla yönetiliyor.
  */
 public class GameManager {
 
     private List<GameObject> gameObjects;
     private Player player;
     private GameObjectFactory factory;
+    private EventManager eventManager;
     private boolean isRunning;
     private int turnCount;
 
     public GameManager() {
         this.gameObjects = new ArrayList<>();
         this.factory = new GameObjectFactory();
+        this.eventManager = new EventManager();
         this.isRunning = false;
         this.turnCount = 0;
+    }
+
+    /**
+     * EventManager'a erişim — listener eklemek için.
+     */
+    public EventManager getEventManager() {
+        return eventManager;
     }
 
     /**
@@ -45,7 +54,7 @@ public class GameManager {
     }
 
     /**
-     * Toplanabilir nesne oluştur — Factory kullanarak
+     * Toplanabilir nesne oluştur
      */
     public Collectible addCollectible(String name, int x, int y, String effect, int amount) {
         Collectible item = factory.createCollectible(name, x, y, effect, amount);
@@ -54,7 +63,7 @@ public class GameManager {
     }
 
     /**
-     * Engel oluştur — Factory kullanarak
+     * Engel oluştur
      */
     public Obstacle addObstacle(String name, int x, int y, boolean destructible, int durability) {
         Obstacle obstacle = factory.createObstacle(name, x, y, destructible, durability);
@@ -77,13 +86,16 @@ public class GameManager {
             checkCollisions();
             cleanupDead();
 
-            // Oyun bitti mi?
             if (player != null && !player.isAlive()) {
+                eventManager.publish(new GameEvent(
+                    GameEvent.EventType.GAME_OVER,
+                    player.getName() + " öldü!",
+                    player, null, 0
+                ));
                 System.out.println("\n💀 GAME OVER! Skor: " + player.getScore());
                 isRunning = false;
             }
 
-            // Tüm düşmanlar öldü mü?
             boolean allEnemiesDead = true;
             for (GameObject obj : gameObjects) {
                 if (obj instanceof Enemy && obj.isAlive()) {
@@ -92,6 +104,11 @@ public class GameManager {
                 }
             }
             if (allEnemiesDead && turnCount > 1) {
+                eventManager.publish(new GameEvent(
+                    GameEvent.EventType.GAME_WON,
+                    "Tüm düşmanlar yok edildi!",
+                    player, null, 0
+                ));
                 System.out.println("\n🎉 TÜM DÜŞMANLAR YOK EDİLDİ! Skor: " + player.getScore());
                 isRunning = false;
             }
@@ -105,7 +122,7 @@ public class GameManager {
     private void updateAll() {
         for (GameObject obj : gameObjects) {
             if (obj.isAlive()) {
-                obj.update(); // Polimorfizm — her nesne kendi update'ini çalıştırır
+                obj.update();
             }
         }
     }
@@ -132,20 +149,33 @@ public class GameManager {
         List<GameObject> toRemove = new ArrayList<>();
         for (GameObject obj : gameObjects) {
             if (!obj.isAlive()) {
-                // Polimorfizm sayesinde artık tip kontrolüne gerek kalmadı
                 if (obj instanceof Enemy) {
                     Enemy enemy = (Enemy) obj;
-                    System.out.println("☠ Düşman yok edildi: " + enemy.getName());
+                    int points = enemy.getEnemyType().equals("BOSS") ? 50 :
+                                 enemy.getEnemyType().equals("TANK") ? 30 : 10;
+
+                    // Observer pattern — olay yayınla
+                    eventManager.publish(new GameEvent(
+                        GameEvent.EventType.ENEMY_KILLED,
+                        enemy.getName() + " (" + enemy.getEnemyType() + ") yok edildi!",
+                        player, enemy, points
+                    ));
+
                     if (player != null && player.isAlive()) {
-                        int points = enemy.getEnemyType().equals("BOSS") ? 50 :
-                                     enemy.getEnemyType().equals("TANK") ? 30 : 10;
                         player.addScore(points);
-                        System.out.println("🏆 +" + points + " puan!");
                     }
                 } else if (obj instanceof Collectible) {
-                    System.out.println("✨ Item toplandı: " + obj.getName());
+                    eventManager.publish(new GameEvent(
+                        GameEvent.EventType.ITEM_COLLECTED,
+                        obj.getName() + " toplandı!",
+                        player, obj, 10
+                    ));
                 } else if (obj instanceof Obstacle) {
-                    System.out.println("💥 Engel yıkıldı: " + obj.getName());
+                    eventManager.publish(new GameEvent(
+                        GameEvent.EventType.OBSTACLE_DESTROYED,
+                        obj.getName() + " yıkıldı!",
+                        player, obj, 5
+                    ));
                 }
                 toRemove.add(obj);
             }
@@ -153,9 +183,6 @@ public class GameManager {
         gameObjects.removeAll(toRemove);
     }
 
-    /**
-     * Mevcut oyun durumunu yazdır
-     */
     public void printStatus() {
         System.out.println("\n=== OYUN DURUMU ===");
         System.out.println("Toplam nesne: " + gameObjects.size());
@@ -166,7 +193,7 @@ public class GameManager {
                     System.out.println("  [OYUNCU] " + p.getName() + " — Can: " + p.getHealth() + " | Skor: " + p.getScore());
                 } else if (obj instanceof Enemy) {
                     Enemy e = (Enemy) obj;
-                    System.out.println("  [DÜŞMAN] " + e.getName() + " (" + e.getEnemyType() + ") — Can: " + e.getHealth());
+                    System.out.println("  [DÜŞMAN] " + e.getName() + " (" + e.getEnemyType() + ") — Can: " + e.getHealth() + " | Strateji: " + e.getMovementStrategy().getStrategyName());
                 } else if (obj instanceof Collectible) {
                     Collectible c = (Collectible) obj;
                     System.out.println("  [ITEM] " + c.getName() + " — Etki: " + c.getItemEffect());
