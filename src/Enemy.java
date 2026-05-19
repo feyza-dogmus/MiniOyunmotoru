@@ -1,41 +1,31 @@
 /**
  * Enemy - Düşman nesnesini temsil eder.
- * Düşmana özel alanlar (enemyType, detectionRange) ve AI davranışları burada.
+ * 
+ * Faz 3: Strategy pattern ile hareket davranışı dışarıdan enjekte ediliyor.
+ * if-else zincirleri tamamen kaldırıldı — her düşman tipine ait
+ * hareket mantığı MovementStrategy implementasyonlarında.
  */
 public class Enemy extends GameObject {
 
-    private String enemyType; // "BASIC", "FAST", "TANK", "BOSS"
+    private String enemyType;
     private int detectionRange;
+    private MovementStrategy movementStrategy; // Strategy Pattern
 
     public Enemy(String name, int x, int y) {
         super(name, x, y, 50, 50, 3, 15);
         this.enemyType = "BASIC";
         this.detectionRange = 8;
+        this.movementStrategy = new RandomMovement(); // varsayılan strateji
     }
 
     @Override
     public void update() {
         if (!isAlive) return;
 
-        // Düşman tipine göre farklı AI hareketi
-        if (enemyType.equals("BASIC")) {
-            x += (int)(Math.random() * 3) - 1;
-            y += (int)(Math.random() * 3) - 1;
-        } else if (enemyType.equals("FAST")) {
-            x += (int)(Math.random() * 5) - 2;
-            y += (int)(Math.random() * 5) - 2;
-        } else if (enemyType.equals("TANK")) {
-            x += (int)(Math.random() * 2) - 1;
-            y += (int)(Math.random() * 2) - 1;
-        } else if (enemyType.equals("BOSS")) {
-            x += (int)(Math.random() * 3) - 1;
-            y += (int)(Math.random() * 3) - 1;
-            if (health < maxHealth) {
-                health += 1; // Boss iyileşir
-            }
-        }
+        // Strategy Pattern — hareket davranışı strateji nesnesine delege edildi
+        movementStrategy.move(this);
 
-        System.out.println("[Düşman] " + name + " (" + enemyType + ") pozisyon: (" + x + ", " + y + ") | Can: " + health);
+        System.out.println("[Düşman] " + name + " (" + enemyType + ") pozisyon: (" + x + ", " + y + ") | Can: " + health + " | Strateji: " + movementStrategy.getStrategyName());
     }
 
     @Override
@@ -55,26 +45,46 @@ public class Enemy extends GameObject {
     }
 
     /**
-     * Düşman tipini ayarla ve stat'ları güncelle
+     * Düşman tipini ayarla ve uygun stratejiyi ata.
      */
     public void setEnemyType(String enemyType) {
         this.enemyType = enemyType;
 
-        if (enemyType.equals("BASIC")) {
-            this.health = 30; this.maxHealth = 30;
-            this.speed = 3; this.damage = 10;
-        } else if (enemyType.equals("FAST")) {
-            this.health = 20; this.maxHealth = 20;
-            this.speed = 7; this.damage = 8;
-        } else if (enemyType.equals("TANK")) {
-            this.health = 100; this.maxHealth = 100;
-            this.speed = 1; this.damage = 25;
-        } else if (enemyType.equals("BOSS")) {
-            this.health = 200; this.maxHealth = 200;
-            this.speed = 2; this.damage = 30;
-            this.detectionRange = 15;
+        // Düşman tipine göre stat ayarla ve strateji ata
+        switch (enemyType) {
+            case "BASIC":
+                this.health = 30; this.maxHealth = 30;
+                this.speed = 3; this.damage = 10;
+                this.movementStrategy = new RandomMovement();
+                break;
+            case "FAST":
+                this.health = 20; this.maxHealth = 20;
+                this.speed = 7; this.damage = 8;
+                this.movementStrategy = new AggressiveMovement();
+                break;
+            case "TANK":
+                this.health = 100; this.maxHealth = 100;
+                this.speed = 1; this.damage = 25;
+                this.movementStrategy = new DefensiveMovement();
+                break;
+            case "BOSS":
+                this.health = 200; this.maxHealth = 200;
+                this.speed = 2; this.damage = 30;
+                this.detectionRange = 15;
+                this.movementStrategy = new BossMovement();
+                break;
         }
     }
+
+    /**
+     * Runtime'da hareket stratejisini değiştir — Strategy Pattern'in gücü.
+     */
+    public void setMovementStrategy(MovementStrategy strategy) {
+        this.movementStrategy = strategy;
+        System.out.println("🔄 " + name + " strateji değiştirdi: " + strategy.getStrategyName());
+    }
+
+    public MovementStrategy getMovementStrategy() { return movementStrategy; }
 
     @Override
     public String getDisplaySymbol() {
